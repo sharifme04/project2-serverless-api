@@ -73,7 +73,7 @@ export default function App() {
         </div>
       )}
 
-      <h2>Uploaded Images ({images.length})</h2>
+      <h2>Uploaded Images/Photo ({images.length})</h2>
       {images.length === 0 && <p style={{ color: '#aaa' }}>No images yet. Upload one above!</p>}
       <ul style={{ listStyle: 'none', padding: 0 }}>
         {images.map(img => (
