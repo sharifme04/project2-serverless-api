@@ -21,11 +21,13 @@ jobs:
       
       - name: Install dependencies
         working-directory: ./frontend
-        run: npm install
+        run: |
+          npm ci
+          npm install -g vite
       
       - name: Build frontend
         working-directory: ./frontend
-        run: npm run build
+        run: npx vite build
         env:
           VITE_API_URL: https://no0gsx5di6.execute-api.us-east-1.amazonaws.com/prod
       
