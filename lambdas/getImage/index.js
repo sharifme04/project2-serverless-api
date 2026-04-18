@@ -1,35 +1,51 @@
-// LOCAL DEV VERSION of getImage Lambda
-// In production: looks up DynamoDB + generates S3 pre-signed URL
-// Locally: looks up metadata.json + returns a local file URL
+import { DynamoDBClient, GetItemCommand } from '@aws-sdk/client-dynamodb';
 
-const fs = require('fs');
-const path = require('path');
+const dynamoDB = new DynamoDBClient({ region: process.env.REGION });
 
-const UPLOADS_DIR = path.join(__dirname, '../../uploads');
-const LOCAL_SERVER_PORT = 3002;
+export const handler = async (event) => {
+    try {
+        const imageId = event.pathParameters?.id;
+        
+        if (!imageId) {
+            return {
+                statusCode: 400,
+                headers: { 'Access-Control-Allow-Origin': '*' },
+                body: JSON.stringify({ error: 'Image ID required' })
+            };
+        }
 
-exports.handler = async (event) => {
-  const id = event.pathParameters?.id;
-  if (!id) {
-    return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'id required' }) };
-  }
+        const result = await dynamoDB.send(new GetItemCommand({
+            TableName: process.env.TABLE_NAME,
+            Key: { imageId: { S: imageId } }
+        }));
 
-  const metaFile = path.join(UPLOADS_DIR, 'metadata.json');
-  const images = fs.existsSync(metaFile) ? JSON.parse(fs.readFileSync(metaFile)) : [];
-  const image = images.find(img => img.imageId === id);
+        if (!result.Item) {
+            return {
+                statusCode: 404,
+                headers: { 'Access-Control-Allow-Origin': '*' },
+                body: JSON.stringify({ error: 'Image not found' })
+            };
+        }
 
-  if (!image) {
-    return { statusCode: 404, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'Not found' }) };
-  }
+        const imageUrl = `https://${process.env.BUCKET_NAME}.s3.amazonaws.com/${result.Item.s3Key.S}`;
 
-  // In production: S3 pre-signed URL (expires in 1 hour)
-  // Locally: serve the file directly from the local server
-  const url = `http://localhost:${LOCAL_SERVER_PORT}/files/${image.fileName}`;
-
-  return {
-    statusCode: 200,
-    // PRODUCTION NOTE: Replace '*' with your actual frontend S3 URL
-    headers: { 'Access-Control-Allow-Origin': '*' },
-    body: JSON.stringify({ url, metadata: image }),
-  };
+        return {
+            statusCode: 200,
+            headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                imageId: result.Item.imageId.S,
+                fileName: result.Item.fileName.S,
+                uploadedAt: result.Item.uploadedAt.S,
+                size: parseInt(result.Item.size.N),
+                url: imageUrl
+            })
+        };
+    } catch (error) {
+        console.error(error);
+        return {
+            statusCode: 500,
+            headers: { 'Access-Control-Allow-Origin': '*' },
+            body: JSON.stringify({ error: error.message })
+        };
+    }
 };
