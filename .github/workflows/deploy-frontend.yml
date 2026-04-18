@@ -21,9 +21,7 @@ jobs:
       
       - name: Install dependencies
         working-directory: ./frontend
-        run: |
-          npm ci
-          npm install -g vite
+        run: npm ci
       
       - name: Build frontend
         working-directory: ./frontend
